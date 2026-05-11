@@ -10,10 +10,13 @@ import {
   Shield,
   ChevronRight,
   Loader2,
+  Camera,
+  Save,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +34,7 @@ import { SessionTimeout } from "@/components/session-timeout";
 import { createClient } from "@/lib/supabase/client";
 
 type UserProfile = {
+  id: string;
   name: string;
   email: string;
   avatarUrl?: string | null;
@@ -41,12 +45,16 @@ export default function SettingsPage() {
   const supabase = createClient();
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [displayName, setDisplayName] = useState("");
 
   useEffect(() => {
-    async function fetchUser() {
+    async function fetchUserAndProfile() {
       const { data, error } = await supabase.auth.getUser();
 
       if (error || !data.user) {
@@ -55,20 +63,157 @@ export default function SettingsPage() {
         return;
       }
 
-      const metadata = data.user.user_metadata ?? {};
+      const user = data.user;
+      const metadata = user.user_metadata ?? {};
+
+      const fallbackName =
+        metadata.name ?? metadata.full_name ?? user.email ?? "ユーザー";
+      const fallbackAvatar = metadata.avatar_url ?? metadata.picture ?? null;
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("id, display_name, avatar_url")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error("fetch profile error:", profileError);
+      }
+
+      if (!profile) {
+        const { error: upsertError } = await supabase.from("profiles").upsert({
+          id: user.id,
+          display_name: fallbackName,
+          avatar_url: fallbackAvatar,
+          //updated_at: new Date().toISOString(),
+        });
+
+        if (upsertError) {
+          console.error("create profile error:", upsertError);
+        }
+      }
+
+      const name = profile?.display_name ?? fallbackName;
+      const avatarUrl = profile?.avatar_url ?? fallbackAvatar;
 
       setUserProfile({
-        name:
-          metadata.name ?? metadata.full_name ?? data.user.email ?? "ユーザー",
-        email: data.user.email ?? "",
-        avatarUrl: metadata.avatar_url ?? metadata.picture ?? null,
+        id: user.id,
+        name,
+        email: user.email ?? "",
+        avatarUrl,
       });
-
+      setDisplayName(name);
       setIsLoading(false);
     }
 
-    fetchUser();
+    fetchUserAndProfile();
   }, [router, supabase]);
+
+  async function handleSaveProfile() {
+    if (!userProfile || isSavingProfile) return;
+
+    const trimmedName = displayName.trim();
+
+    if (!trimmedName) {
+      alert("ニックネームを入力してください。");
+      return;
+    }
+
+    setIsSavingProfile(true);
+
+    try {
+      const { error } = await supabase.from("profiles").upsert({
+        id: userProfile.id,
+        display_name: trimmedName,
+        avatar_url: userProfile.avatarUrl ?? null,
+        //updated_at: new Date().toISOString(),
+      });
+
+      if (error) {
+        console.error("save profile error:", error);
+        alert("プロフィールの保存に失敗しました。");
+        return;
+      }
+
+      setUserProfile((prev) =>
+        prev ? { ...prev, name: trimmedName } : prev
+      );
+
+      alert("プロフィールを保存しました。");
+    } catch (error) {
+      console.error("handleSaveProfile error:", error);
+      alert("プロフィール保存中にエラーが発生しました。");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  }
+
+  async function handleAvatarChange(event: React.ChangeEvent<HTMLInputElement>) {
+    if (!userProfile) return;
+
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("画像ファイルを選択してください。");
+      return;
+    }
+
+    const maxSize = 2 * 1024 * 1024;
+
+    if (file.size > maxSize) {
+      alert("画像サイズは2MB以下にしてください。");
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const fileExt = file.name.split(".").pop() ?? "png";
+      const filePath = `${userProfile.id}/avatar.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("avatars")
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        console.error("avatar upload error:", uploadError);
+        alert("画像のアップロードに失敗しました。");
+        return;
+      }
+
+      const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
+
+      const publicUrl = `${data.publicUrl}?t=${Date.now()}`;
+
+      const { error: profileError } = await supabase.from("profiles").upsert({
+        id: userProfile.id,
+        display_name: displayName.trim() || userProfile.name,
+        avatar_url: publicUrl,
+        //updated_at: new Date().toISOString(),
+      });
+
+      if (profileError) {
+        console.error("avatar profile update error:", profileError);
+        alert("プロフィール画像の保存に失敗しました。");
+        return;
+      }
+
+      setUserProfile((prev) =>
+        prev ? { ...prev, avatarUrl: publicUrl } : prev
+      );
+    } catch (error) {
+      console.error("handleAvatarChange error:", error);
+      alert("画像更新中にエラーが発生しました。");
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+    }
+  }
 
   const handleDeleteData = async () => {
     setIsDeleting(true);
@@ -78,9 +223,7 @@ export default function SettingsPage() {
 
       if (userError || !data.user) {
         console.error("getUser error:", userError);
-        alert(
-          "ログイン状態を確認できませんでした。もう一度ログインしてください。",
-        );
+        alert("ログイン状態を確認できませんでした。もう一度ログインしてください。");
         router.replace("/login");
         return;
       }
@@ -187,7 +330,7 @@ export default function SettingsPage() {
 
             <CardContent>
               <div className="flex items-center gap-4">
-                <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary/10">
+                <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-primary/10">
                   {userProfile?.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -196,7 +339,13 @@ export default function SettingsPage() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <User className="h-7 w-7 text-primary" />
+                    <User className="h-8 w-8 text-primary" />
+                  )}
+
+                  {isUploadingAvatar && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/70">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                    </div>
                   )}
                 </div>
 
@@ -211,6 +360,65 @@ export default function SettingsPage() {
                       {userProfile?.email}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-foreground">
+                    ニックネーム
+                  </label>
+                  <Input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="ニックネームを入力"
+                    maxLength={30}
+                    className="rounded-xl"
+                    disabled={isSavingProfile}
+                  />
+                  <p className="text-right text-xs text-muted-foreground">
+                    {displayName.length}/30
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-xl"
+                    disabled={isUploadingAvatar}
+                    asChild
+                  >
+                    <label className="cursor-pointer">
+                      {isUploadingAvatar ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Camera className="mr-2 h-4 w-4" />
+                      )}
+                      画像を変更
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleAvatarChange}
+                        disabled={isUploadingAvatar}
+                      />
+                    </label>
+                  </Button>
+
+                  <Button
+                    type="button"
+                    className="rounded-xl"
+                    onClick={handleSaveProfile}
+                    disabled={isSavingProfile || !displayName.trim()}
+                  >
+                    {isSavingProfile ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="mr-2 h-4 w-4" />
+                    )}
+                    保存
+                  </Button>
                 </div>
               </div>
 
