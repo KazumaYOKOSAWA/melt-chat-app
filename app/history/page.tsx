@@ -9,6 +9,7 @@ import { RiskBadge } from "@/components/risk-badge";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { SessionTimeout } from "@/components/session-timeout";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import { createClient } from "@/lib/supabase/client";
 import type { RiskLevel } from "@/lib/types";
 
@@ -42,6 +43,7 @@ function normalizeRiskLevel(value: unknown): RiskLevel {
 
 export default function HistoryPage() {
   const supabase = createClient();
+  const { profile } = useUserProfile();
 
   const [activeTab, setActiveTab] = useState<"mood" | "conversations">(
     "conversations",
@@ -128,7 +130,9 @@ export default function HistoryPage() {
           <div className="mb-6">
             <h1 className="text-xl font-bold text-foreground">履歴</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              過去の気分記録と会話を確認できます
+              {profile?.displayName
+                ? `${profile.displayName}さんの過去の気分記録と会話を確認できます`
+                : "過去の気分記録と会話を確認できます"}
             </p>
           </div>
 

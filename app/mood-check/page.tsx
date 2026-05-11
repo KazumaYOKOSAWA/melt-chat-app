@@ -10,6 +10,7 @@ import { MoodScale } from "@/components/mood-scale";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { SessionTimeout } from "@/components/session-timeout";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import type { MoodCheckInput } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -18,7 +19,7 @@ const MAX_NOTE_LENGTH = 200;
 export default function MoodCheckPage() {
   const router = useRouter();
   const supabase = createClient();
-
+  const { profile } = useUserProfile();
   const [moodData, setMoodData] = useState<MoodCheckInput>({
     mood: 3,
     anxiety: 3,
@@ -92,7 +93,9 @@ export default function MoodCheckPage() {
               今日の気分チェック
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              今の状態を教えてください
+              {profile?.displayName
+                ? `${profile.displayName}さん、今の状態を教えてください`
+                : "今の状態を教えてください"}
             </p>
           </div>
 

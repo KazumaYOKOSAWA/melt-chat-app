@@ -53,6 +53,13 @@ export interface User {
   onboardingCompleted: boolean
 }
 
+export interface UserProfile {
+  id: string
+  displayName: string
+  email: string
+  avatarUrl?: string | null
+}
+
 // App State Types
 export type AppPage = "welcome" | "onboarding" | "mood-check" | "chat" | "history" | "reflection" | "settings"
 

@@ -32,13 +32,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { SessionTimeout } from "@/components/session-timeout";
 import { createClient } from "@/lib/supabase/client";
-
-type UserProfile = {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl?: string | null;
-};
+import type { UserProfile } from "@/lib/types";
 
 export default function SettingsPage() {
   const router = useRouter();

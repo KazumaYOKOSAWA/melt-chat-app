@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useEffect } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   MessageCircle,
   History,
@@ -10,49 +10,32 @@ import {
   LogOut,
   Loader2,
   Heart,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { BottomNav } from "@/components/bottom-nav";
-import { DesktopSidebar } from "@/components/desktop-sidebar";
-import { SessionTimeout } from "@/components/session-timeout";
+} from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { BottomNav } from "@/components/bottom-nav"
+import { DesktopSidebar } from "@/components/desktop-sidebar"
+import { SessionTimeout } from "@/components/session-timeout"
+import { useUserProfile } from "@/hooks/use-user-profile"
 import { createClient } from "@/lib/supabase/client";
 
 export default function HomePage() {
   const router = useRouter();
   const supabase = createClient();
-
-  const [loading, setLoading] = useState(true);
-  const [userName, setUserName] = useState<string>("");
+  const { profile, loading: profileLoading, hasUser } = useUserProfile();
 
   useEffect(() => {
-    async function checkAuth() {
-      const { data, error } = await supabase.auth.getUser();
-
-      if (error || !data.user) {
-        router.replace("/login");
-        return;
-      }
-
-      const name =
-        data.user.user_metadata?.name ??
-        data.user.user_metadata?.full_name ??
-        data.user.email ??
-        "";
-
-      setUserName(name);
-      setLoading(false);
+    if (hasUser === false) {
+      router.replace("/login");
     }
-
-    checkAuth();
-  }, [router, supabase]);
+  }, [hasUser, router]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
     router.replace("/login");
   }
 
-  if (loading) {
+  if (profileLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
         <div className="flex flex-col items-center gap-3 text-muted-foreground">
@@ -81,7 +64,7 @@ export default function HomePage() {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">melt</h1>
                 <p className="text-sm text-muted-foreground">
-                  おかえりなさい{userName ? `、${userName}さん` : ""}
+                  おかえりなさい{profile?.displayName ? `、${profile.displayName}さん` : ""}
                 </p>
               </div>
             </div>

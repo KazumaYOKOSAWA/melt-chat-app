@@ -10,6 +10,7 @@ import { CrisisSupportModal } from "@/components/crisis-support-modal";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { SessionTimeout } from "@/components/session-timeout";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import type { Message, RiskLevel } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 
@@ -29,6 +30,7 @@ function normalizeRiskLevel(value: unknown): RiskLevel {
 export default function ChatPage() {
   const supabase = createClient();
   const router = useRouter();
+  const { profile } = useUserProfile();
   const [conversationIdFromUrl, setConversationIdFromUrl] = useState<
     string | null
   >(null);
@@ -426,6 +428,12 @@ export default function ChatPage() {
             </div>
           </div>
         </header>
+
+        {profile?.displayName && (
+          <div className="border-b border-border px-4 py-3 text-sm text-muted-foreground">
+            {profile.displayName}さん、今の気持ちをそのまま書き出してみてください。
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <div className="mx-auto max-w-2xl space-y-4">

@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BottomNav } from "@/components/bottom-nav";
 import { DesktopSidebar } from "@/components/desktop-sidebar";
 import { SessionTimeout } from "@/components/session-timeout";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import { createClient } from "@/lib/supabase/client";
 
 type Trend = "up" | "down" | "stable";
@@ -192,7 +193,7 @@ function buildInsight({
 
 export default function ReflectionPage() {
   const supabase = createClient();
-
+  const { profile } = useUserProfile();
   const [moodLogs, setMoodLogs] = useState<MoodLogRow[]>([]);
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -300,7 +301,9 @@ export default function ReflectionPage() {
               最近の気持ちの変化
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              直近7日間の記録から
+              {profile?.displayName
+                ? `${profile.displayName}さんの直近7日間の記録から`
+                : "直近7日間の記録から"}
             </p>
           </div>
 

@@ -38,7 +38,7 @@ export default function LoginPage() {
   async function handleGoogleLogin() {
     if (isLoggingIn) return
 
-    setIsLoggingIn(true)
+    //setIsLoggingIn(true)
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
